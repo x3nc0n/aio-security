@@ -1,0 +1,23 @@
+# Build artifacts
+*.json
+!azuredeploy.json
+
+# Editor
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Node (CI tooling)
+node_modules/
+
+# Bicep cache
+.bicep/

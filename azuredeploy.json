@@ -1,0 +1,1264 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.42.1.51946",
+      "templateHash": "4844435756366610753"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "eastus2",
+      "metadata": {
+        "description": "Azure region for deployed resources."
+      }
+    },
+    "sentinelWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the Log Analytics workspace used by Microsoft Sentinel (security logs)."
+      }
+    },
+    "opsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the Log Analytics workspace for IT-Ops / non-security operational telemetry."
+      }
+    },
+    "assignmentScope": {
+      "type": "string",
+      "defaultValue": "[subscription().id]",
+      "metadata": {
+        "description": "Scope for policy assignments (subscription or management group resource ID)."
+      }
+    },
+    "deployDiagnostics": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Deploy diagnostic settings modules."
+      }
+    },
+    "deployPolicies": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Deploy Azure Policy assignment modules."
+      }
+    },
+    "deployDataCollectionRules": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Deploy Data Collection Rule modules."
+      }
+    },
+    "deploySentinelConnectors": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Deploy Sentinel data connector modules."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2024-03-01",
+      "name": "rg-aio-security",
+      "location": "[parameters('location')]"
+    },
+    {
+      "condition": "[parameters('deployDiagnostics')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "aio-diagnostics",
+      "resourceGroup": "rg-aio-security",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "sentinelWorkspaceId": {
+            "value": "[parameters('sentinelWorkspaceId')]"
+          },
+          "opsWorkspaceId": {
+            "value": "[parameters('opsWorkspaceId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "5534729958739751009"
+            }
+          },
+          "parameters": {
+            "sentinelWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Sentinel workspace resource ID (security-relevant logs)."
+              }
+            },
+            "opsWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "ITOps workspace resource ID (operational telemetry)."
+              }
+            },
+            "mqttBrokerName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the AIO MQTT Broker resource. Leave empty to skip."
+              }
+            },
+            "dataProcessorName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the AIO Data Processor resource. Leave empty to skip."
+              }
+            },
+            "opcUaConnectorName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the OPC UA Connector resource. Leave empty to skip."
+              }
+            },
+            "aioResourceGroup": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().name]",
+              "metadata": {
+                "description": "Resource group containing the AIO resources."
+              }
+            }
+          },
+          "resources": [
+            {
+              "condition": "[not(empty(parameters('mqttBrokerName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.IoTOperationsMQ/mq', parameters('mqttBrokerName'))]",
+              "name": "mqtt-broker-security-to-sentinel",
+              "properties": {
+                "workspaceId": "[parameters('sentinelWorkspaceId')]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "category": "AllMetrics",
+                    "enabled": false
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('mqttBrokerName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.IoTOperationsMQ/mq', parameters('mqttBrokerName'))]",
+              "name": "mqtt-broker-ops-to-itops",
+              "properties": {
+                "workspaceId": "[parameters('opsWorkspaceId')]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": false
+                  }
+                ],
+                "metrics": [
+                  {
+                    "category": "AllMetrics",
+                    "enabled": true
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('dataProcessorName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.IoTOperationsDataProcessor/instances', parameters('dataProcessorName'))]",
+              "name": "data-processor-security-to-sentinel",
+              "properties": {
+                "workspaceId": "[parameters('sentinelWorkspaceId')]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('dataProcessorName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.IoTOperationsDataProcessor/instances', parameters('dataProcessorName'))]",
+              "name": "data-processor-ops-to-itops",
+              "properties": {
+                "workspaceId": "[parameters('opsWorkspaceId')]",
+                "metrics": [
+                  {
+                    "category": "AllMetrics",
+                    "enabled": true
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('opcUaConnectorName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.IoTOperationsOrchestratorConnector/instances', parameters('opcUaConnectorName'))]",
+              "name": "opcua-connector-security-to-sentinel",
+              "properties": {
+                "workspaceId": "[parameters('sentinelWorkspaceId')]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('opcUaConnectorName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.IoTOperationsOrchestratorConnector/instances', parameters('opcUaConnectorName'))]",
+              "name": "opcua-connector-ops-to-itops",
+              "properties": {
+                "workspaceId": "[parameters('opsWorkspaceId')]",
+                "metrics": [
+                  {
+                    "category": "AllMetrics",
+                    "enabled": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', 'rg-aio-security')]"
+      ]
+    },
+    {
+      "condition": "[parameters('deployDiagnostics')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "arc-k8s-diagnostics",
+      "resourceGroup": "rg-aio-security",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "sentinelWorkspaceId": {
+            "value": "[parameters('sentinelWorkspaceId')]"
+          },
+          "opsWorkspaceId": {
+            "value": "[parameters('opsWorkspaceId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "7864083141019810181"
+            }
+          },
+          "parameters": {
+            "sentinelWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Sentinel workspace resource ID (security-relevant logs)."
+              }
+            },
+            "opsWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "ITOps workspace resource ID (operational telemetry)."
+              }
+            },
+            "arcClusterName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the Arc-enabled Kubernetes cluster. Leave empty to skip."
+              }
+            }
+          },
+          "resources": [
+            {
+              "condition": "[not(empty(parameters('arcClusterName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.Kubernetes/connectedClusters', parameters('arcClusterName'))]",
+              "name": "arc-k8s-security-to-sentinel",
+              "properties": {
+                "workspaceId": "[parameters('sentinelWorkspaceId')]",
+                "logs": [
+                  {
+                    "category": "kube-audit-admin",
+                    "enabled": true
+                  },
+                  {
+                    "category": "kube-audit",
+                    "enabled": true
+                  },
+                  {
+                    "category": "guard",
+                    "enabled": true
+                  }
+                ]
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('arcClusterName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.Kubernetes/connectedClusters', parameters('arcClusterName'))]",
+              "name": "arc-k8s-ops-to-itops",
+              "properties": {
+                "workspaceId": "[parameters('opsWorkspaceId')]",
+                "logs": [
+                  {
+                    "category": "kube-controller-manager",
+                    "enabled": true
+                  },
+                  {
+                    "category": "kube-scheduler",
+                    "enabled": true
+                  },
+                  {
+                    "category": "cluster-autoscaler",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "category": "AllMetrics",
+                    "enabled": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', 'rg-aio-security')]"
+      ]
+    },
+    {
+      "condition": "[parameters('deployPolicies')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "cis-azure-foundations",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "assignmentScope": {
+            "value": "[parameters('assignmentScope')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "11654104725427417546"
+            }
+          },
+          "parameters": {
+            "assignmentScope": {
+              "type": "string",
+              "defaultValue": "[subscription().id]",
+              "metadata": {
+                "description": "Scope for the policy assignment (subscription or management group ID)."
+              }
+            },
+            "enforcementMode": {
+              "type": "string",
+              "defaultValue": "Default",
+              "allowedValues": [
+                "Default",
+                "DoNotEnforce"
+              ],
+              "metadata": {
+                "description": "Enforcement mode: Default (enforce) or DoNotEnforce (audit only)."
+              }
+            }
+          },
+          "variables": {
+            "cisAzurePolicySetId": "/providers/Microsoft.Authorization/policySetDefinitions/06f19060-9e68-4070-92ca-f15cc126059e"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/policyAssignments",
+              "apiVersion": "2024-04-01",
+              "name": "cis-azure-foundations-v2",
+              "properties": {
+                "displayName": "CIS Microsoft Azure Foundations Benchmark v2.0.0",
+                "description": "Assigns the CIS Microsoft Azure Foundations Benchmark v2.0.0 initiative to evaluate compliance of Azure resources against industry-standard security controls.",
+                "policyDefinitionId": "[variables('cisAzurePolicySetId')]",
+                "enforcementMode": "[parameters('enforcementMode')]",
+                "parameters": {},
+                "nonComplianceMessages": [
+                  {
+                    "message": "This resource does not comply with CIS Microsoft Azure Foundations Benchmark v2.0. Review the recommendation in Microsoft Defender for Cloud."
+                  }
+                ]
+              }
+            }
+          ],
+          "outputs": {
+            "assignmentId": {
+              "type": "string",
+              "value": "[subscriptionResourceId('Microsoft.Authorization/policyAssignments', 'cis-azure-foundations-v2')]"
+            },
+            "assignmentName": {
+              "type": "string",
+              "value": "cis-azure-foundations-v2"
+            }
+          }
+        }
+      }
+    },
+    {
+      "condition": "[parameters('deployPolicies')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "cis-kubernetes",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "assignmentScope": {
+            "value": "[parameters('assignmentScope')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "7849238434428211764"
+            }
+          },
+          "parameters": {
+            "assignmentScope": {
+              "type": "string",
+              "defaultValue": "[subscription().id]",
+              "metadata": {
+                "description": "Scope for the policy assignment (subscription or management group ID)."
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the managed identity (required for DeployIfNotExists remediation)."
+              }
+            },
+            "enforcementMode": {
+              "type": "string",
+              "defaultValue": "Default",
+              "allowedValues": [
+                "Default",
+                "DoNotEnforce"
+              ],
+              "metadata": {
+                "description": "Enforcement mode: Default (enforce) or DoNotEnforce (audit only)."
+              }
+            }
+          },
+          "variables": {
+            "k8sBaselinePolicySetId": "/providers/Microsoft.Authorization/policySetDefinitions/a8640138-9b0a-4a28-b8cb-1666c838647d",
+            "azurePolicyAddonId": "/providers/Microsoft.Authorization/policyDefinitions/0adc5395-9169-4b9b-8687-af838d69410a"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/policyAssignments",
+              "apiVersion": "2024-04-01",
+              "name": "cis-kubernetes-benchmark",
+              "location": "[parameters('location')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "displayName": "Kubernetes Cluster Pod Security Baseline",
+                "description": "Enforces pod security baseline standards on Kubernetes clusters including Arc-enabled K8s running Azure IoT Operations workloads.",
+                "policyDefinitionId": "[variables('k8sBaselinePolicySetId')]",
+                "enforcementMode": "[parameters('enforcementMode')]",
+                "parameters": {
+                  "effect": {
+                    "value": "Audit"
+                  }
+                },
+                "nonComplianceMessages": [
+                  {
+                    "message": "This Kubernetes resource does not meet pod security baseline requirements. See CIS Kubernetes Benchmark controls."
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/policyAssignments",
+              "apiVersion": "2024-04-01",
+              "name": "k8s-azure-policy-addon",
+              "location": "[parameters('location')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "displayName": "Azure Policy Add-on for Kubernetes",
+                "description": "Ensures the Azure Policy add-on is deployed on Arc-enabled Kubernetes clusters to enable policy enforcement.",
+                "policyDefinitionId": "[variables('azurePolicyAddonId')]",
+                "enforcementMode": "[parameters('enforcementMode')]",
+                "parameters": {
+                  "effect": {
+                    "value": "DeployIfNotExists"
+                  }
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "baselineAssignmentId": {
+              "type": "string",
+              "value": "[subscriptionResourceId('Microsoft.Authorization/policyAssignments', 'cis-kubernetes-benchmark')]"
+            },
+            "policyAddonAssignmentId": {
+              "type": "string",
+              "value": "[subscriptionResourceId('Microsoft.Authorization/policyAssignments', 'k8s-azure-policy-addon')]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "condition": "[parameters('deployPolicies')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "aio-custom-policies",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "assignmentScope": {
+            "value": "[parameters('assignmentScope')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "sentinelWorkspaceId": {
+            "value": "[parameters('sentinelWorkspaceId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "927612424918843132"
+            }
+          },
+          "parameters": {
+            "assignmentScope": {
+              "type": "string",
+              "defaultValue": "[subscription().id]",
+              "metadata": {
+                "description": "Scope for the policy assignment."
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the managed identity."
+              }
+            },
+            "sentinelWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Sentinel workspace ID for diagnostic settings enforcement."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/policyDefinitions",
+              "apiVersion": "2024-05-01",
+              "name": "aio-require-diagnostic-settings",
+              "properties": {
+                "displayName": "AIO: Require diagnostic settings on IoT Operations resources",
+                "description": "Deploys diagnostic settings to route all logs to a Log Analytics workspace when an AIO resource is created or updated without them.",
+                "policyType": "Custom",
+                "mode": "Indexed",
+                "metadata": {
+                  "category": "IoT Operations",
+                  "version": "1.0.0"
+                },
+                "parameters": {
+                  "workspaceId": {
+                    "type": "String",
+                    "metadata": {
+                      "displayName": "Log Analytics Workspace ID",
+                      "description": "Resource ID of the Log Analytics workspace for diagnostic logs."
+                    }
+                  },
+                  "effect": {
+                    "type": "String",
+                    "defaultValue": "DeployIfNotExists",
+                    "allowedValues": [
+                      "DeployIfNotExists",
+                      "Disabled"
+                    ],
+                    "metadata": {
+                      "displayName": "Effect"
+                    }
+                  }
+                },
+                "policyRule": {
+                  "if": {
+                    "field": "type",
+                    "in": [
+                      "Microsoft.IoTOperationsMQ/mq",
+                      "Microsoft.IoTOperationsDataProcessor/instances",
+                      "Microsoft.IoTOperationsOrchestratorConnector/instances"
+                    ]
+                  },
+                  "then": {
+                    "effect": "[[parameters('effect')]",
+                    "details": {
+                      "type": "Microsoft.Insights/diagnosticSettings",
+                      "existenceCondition": {
+                        "allOf": [
+                          {
+                            "field": "Microsoft.Insights/diagnosticSettings/logs.enabled",
+                            "equals": "true"
+                          },
+                          {
+                            "field": "Microsoft.Insights/diagnosticSettings/workspaceId",
+                            "equals": "[[parameters('workspaceId')]"
+                          }
+                        ]
+                      },
+                      "roleDefinitionIds": [
+                        "/providers/Microsoft.Authorization/roleDefinitions/749f88d5-cbae-40b8-bcfc-e573ddc772fa",
+                        "/providers/Microsoft.Authorization/roleDefinitions/92aaf0da-9dab-42b6-94a3-d43ce8d16293"
+                      ],
+                      "deployment": {
+                        "properties": {
+                          "mode": "incremental",
+                          "template": {
+                            "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                            "contentVersion": "1.0.0.0",
+                            "parameters": {
+                              "resourceName": {
+                                "type": "string"
+                              },
+                              "workspaceId": {
+                                "type": "string"
+                              }
+                            },
+                            "resources": [
+                              {
+                                "type": "Microsoft.Insights/diagnosticSettings",
+                                "apiVersion": "2021-05-01-preview",
+                                "name": "aio-security-diag",
+                                "scope": "[[concat('Microsoft.IoTOperationsMQ/mq/', parameters('resourceName'))]",
+                                "properties": {
+                                  "workspaceId": "[[parameters('workspaceId')]",
+                                  "logs": [
+                                    {
+                                      "categoryGroup": "allLogs",
+                                      "enabled": true
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "parameters": {
+                            "resourceName": {
+                              "value": "[[field('name')]"
+                            },
+                            "workspaceId": {
+                              "value": "[[parameters('workspaceId')]"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/policyAssignments",
+              "apiVersion": "2024-04-01",
+              "name": "aio-enforce-diagnostics",
+              "location": "[parameters('location')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "displayName": "AIO: Enforce diagnostic settings on IoT Operations resources",
+                "description": "Automatically deploys diagnostic settings on AIO resources to ensure security log visibility.",
+                "policyDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/policyDefinitions', 'aio-require-diagnostic-settings')]",
+                "enforcementMode": "Default",
+                "parameters": {
+                  "workspaceId": {
+                    "value": "[parameters('sentinelWorkspaceId')]"
+                  }
+                }
+              },
+              "dependsOn": [
+                "[subscriptionResourceId('Microsoft.Authorization/policyDefinitions', 'aio-require-diagnostic-settings')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/policyDefinitions",
+              "apiVersion": "2024-05-01",
+              "name": "aio-audit-mqtt-tls",
+              "properties": {
+                "displayName": "AIO: Audit MQTT Broker TLS enforcement",
+                "description": "Audits Azure IoT Operations MQTT Broker instances to ensure TLS is enabled for all listener ports.",
+                "policyType": "Custom",
+                "mode": "Indexed",
+                "metadata": {
+                  "category": "IoT Operations",
+                  "version": "1.0.0"
+                },
+                "parameters": {
+                  "effect": {
+                    "type": "String",
+                    "defaultValue": "Audit",
+                    "allowedValues": [
+                      "Audit",
+                      "Disabled"
+                    ],
+                    "metadata": {
+                      "displayName": "Effect"
+                    }
+                  }
+                },
+                "policyRule": {
+                  "if": {
+                    "allOf": [
+                      {
+                        "field": "type",
+                        "equals": "Microsoft.IoTOperationsMQ/mq/broker/listener"
+                      },
+                      {
+                        "field": "Microsoft.IoTOperationsMQ/mq/broker/listener/tls",
+                        "exists": "false"
+                      }
+                    ]
+                  },
+                  "then": {
+                    "effect": "[[parameters('effect')]"
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/policyAssignments",
+              "apiVersion": "2024-04-01",
+              "name": "aio-audit-mqtt-tls",
+              "properties": {
+                "displayName": "AIO: Audit MQTT Broker TLS enforcement",
+                "description": "Identifies MQTT Broker listeners that do not have TLS enabled.",
+                "policyDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/policyDefinitions', 'aio-audit-mqtt-tls')]",
+                "enforcementMode": "Default",
+                "parameters": {}
+              },
+              "dependsOn": [
+                "[subscriptionResourceId('Microsoft.Authorization/policyDefinitions', 'aio-audit-mqtt-tls')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/policyDefinitions",
+              "apiVersion": "2024-05-01",
+              "name": "aio-audit-mqtt-auth",
+              "properties": {
+                "displayName": "AIO: Audit MQTT Broker authentication enabled",
+                "description": "Audits Azure IoT Operations MQTT Broker instances to ensure authentication is configured and not set to anonymous.",
+                "policyType": "Custom",
+                "mode": "Indexed",
+                "metadata": {
+                  "category": "IoT Operations",
+                  "version": "1.0.0"
+                },
+                "parameters": {
+                  "effect": {
+                    "type": "String",
+                    "defaultValue": "Audit",
+                    "allowedValues": [
+                      "Audit",
+                      "Disabled"
+                    ],
+                    "metadata": {
+                      "displayName": "Effect"
+                    }
+                  }
+                },
+                "policyRule": {
+                  "if": {
+                    "allOf": [
+                      {
+                        "field": "type",
+                        "equals": "Microsoft.IoTOperationsMQ/mq/broker/authentication"
+                      },
+                      {
+                        "anyOf": [
+                          {
+                            "field": "Microsoft.IoTOperationsMQ/mq/broker/authentication/authenticationMethods",
+                            "exists": "false"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "then": {
+                    "effect": "[[parameters('effect')]"
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/policyAssignments",
+              "apiVersion": "2024-04-01",
+              "name": "aio-audit-mqtt-auth",
+              "properties": {
+                "displayName": "AIO: Audit MQTT Broker authentication enabled",
+                "description": "Identifies MQTT Broker instances without authentication configured.",
+                "policyDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/policyDefinitions', 'aio-audit-mqtt-auth')]",
+                "enforcementMode": "Default",
+                "parameters": {}
+              },
+              "dependsOn": [
+                "[subscriptionResourceId('Microsoft.Authorization/policyDefinitions', 'aio-audit-mqtt-auth')]"
+              ]
+            }
+          ],
+          "outputs": {
+            "diagPolicyId": {
+              "type": "string",
+              "value": "[subscriptionResourceId('Microsoft.Authorization/policyDefinitions', 'aio-require-diagnostic-settings')]"
+            },
+            "tlsPolicyId": {
+              "type": "string",
+              "value": "[subscriptionResourceId('Microsoft.Authorization/policyDefinitions', 'aio-audit-mqtt-tls')]"
+            },
+            "authPolicyId": {
+              "type": "string",
+              "value": "[subscriptionResourceId('Microsoft.Authorization/policyDefinitions', 'aio-audit-mqtt-auth')]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "condition": "[parameters('deployDataCollectionRules')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "syslog-dcr",
+      "resourceGroup": "rg-aio-security",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "sentinelWorkspaceId": {
+            "value": "[parameters('sentinelWorkspaceId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "14511851827626142515"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the DCR."
+              }
+            },
+            "sentinelWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Sentinel workspace resource ID."
+              }
+            },
+            "dcrName": {
+              "type": "string",
+              "defaultValue": "dcr-aio-syslog-sentinel",
+              "metadata": {
+                "description": "Name of the syslog data collection rule."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/dataCollectionRules",
+              "apiVersion": "2023-03-11",
+              "name": "[parameters('dcrName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "description": "Collects security-relevant syslog data from AIO edge nodes via Azure Monitor Agent and routes to Sentinel.",
+                "dataSources": {
+                  "syslog": [
+                    {
+                      "name": "syslogAuthSecurity",
+                      "streams": [
+                        "Microsoft-Syslog"
+                      ],
+                      "facilityNames": [
+                        "auth",
+                        "authpriv"
+                      ],
+                      "logLevels": [
+                        "Info",
+                        "Notice",
+                        "Warning",
+                        "Error",
+                        "Critical",
+                        "Alert",
+                        "Emergency"
+                      ]
+                    },
+                    {
+                      "name": "syslogSystem",
+                      "streams": [
+                        "Microsoft-Syslog"
+                      ],
+                      "facilityNames": [
+                        "syslog",
+                        "daemon",
+                        "kern"
+                      ],
+                      "logLevels": [
+                        "Warning",
+                        "Error",
+                        "Critical",
+                        "Alert",
+                        "Emergency"
+                      ]
+                    }
+                  ]
+                },
+                "destinations": {
+                  "logAnalytics": [
+                    {
+                      "name": "sentinelWorkspace",
+                      "workspaceResourceId": "[parameters('sentinelWorkspaceId')]"
+                    }
+                  ]
+                },
+                "dataFlows": [
+                  {
+                    "streams": [
+                      "Microsoft-Syslog"
+                    ],
+                    "destinations": [
+                      "sentinelWorkspace"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "outputs": {
+            "dcrId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/dataCollectionRules', parameters('dcrName'))]"
+            },
+            "dcrName": {
+              "type": "string",
+              "value": "[parameters('dcrName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', 'rg-aio-security')]"
+      ]
+    },
+    {
+      "condition": "[parameters('deployDataCollectionRules')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "k8s-dcr",
+      "resourceGroup": "rg-aio-security",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "sentinelWorkspaceId": {
+            "value": "[parameters('sentinelWorkspaceId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "15146188835843716686"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the DCR."
+              }
+            },
+            "sentinelWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Sentinel workspace resource ID."
+              }
+            },
+            "dcrName": {
+              "type": "string",
+              "defaultValue": "dcr-aio-k8s-container-insights",
+              "metadata": {
+                "description": "Name of the Container Insights DCR."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/dataCollectionRules",
+              "apiVersion": "2023-03-11",
+              "name": "[parameters('dcrName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "description": "Collects Container Insights data from Arc-enabled K8s clusters running AIO workloads. Routes container logs and Kubernetes events to Sentinel.",
+                "dataSources": {
+                  "extensions": [
+                    {
+                      "name": "ContainerInsightsExtension",
+                      "streams": [
+                        "Microsoft-ContainerLog",
+                        "Microsoft-ContainerLogV2",
+                        "Microsoft-KubeEvents",
+                        "Microsoft-KubePodInventory",
+                        "Microsoft-KubeNodeInventory",
+                        "Microsoft-KubeServices",
+                        "Microsoft-InsightsMetrics"
+                      ],
+                      "extensionName": "ContainerInsights",
+                      "extensionSettings": {
+                        "dataCollectionSettings": {
+                          "interval": "1m",
+                          "namespaceFilteringMode": "Include",
+                          "namespaces": [
+                            "azure-iot-operations",
+                            "kube-system",
+                            "default"
+                          ],
+                          "enableContainerLogV2": true
+                        }
+                      }
+                    }
+                  ]
+                },
+                "destinations": {
+                  "logAnalytics": [
+                    {
+                      "name": "sentinelWorkspace",
+                      "workspaceResourceId": "[parameters('sentinelWorkspaceId')]"
+                    }
+                  ]
+                },
+                "dataFlows": [
+                  {
+                    "streams": [
+                      "Microsoft-ContainerLog",
+                      "Microsoft-ContainerLogV2",
+                      "Microsoft-KubeEvents",
+                      "Microsoft-KubePodInventory"
+                    ],
+                    "destinations": [
+                      "sentinelWorkspace"
+                    ]
+                  },
+                  {
+                    "streams": [
+                      "Microsoft-KubeNodeInventory",
+                      "Microsoft-KubeServices",
+                      "Microsoft-InsightsMetrics"
+                    ],
+                    "destinations": [
+                      "sentinelWorkspace"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "outputs": {
+            "dcrId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/dataCollectionRules', parameters('dcrName'))]"
+            },
+            "dcrName": {
+              "type": "string",
+              "value": "[parameters('dcrName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', 'rg-aio-security')]"
+      ]
+    },
+    {
+      "condition": "[parameters('deploySentinelConnectors')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "sentinel-data-connectors",
+      "resourceGroup": "rg-aio-security",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "sentinelWorkspaceId": {
+            "value": "[parameters('sentinelWorkspaceId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "6169557061075461760"
+            }
+          },
+          "parameters": {
+            "sentinelWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Sentinel workspace resource ID."
+              }
+            }
+          },
+          "variables": {
+            "workspaceName": "[last(split(parameters('sentinelWorkspaceId'), '/'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.SecurityInsights/dataConnectors",
+              "apiVersion": "2024-03-01",
+              "scope": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]",
+              "name": "microsoft-365-defender-connector",
+              "kind": "MicrosoftThreatProtection",
+              "properties": {
+                "tenantId": "[subscription().tenantId]",
+                "dataTypes": {
+                  "incidents": {
+                    "connectionState": "Enabled"
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.SecurityInsights/dataConnectors",
+              "apiVersion": "2024-03-01",
+              "scope": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]",
+              "name": "azure-activity-connector",
+              "kind": "AzureActivity",
+              "properties": {
+                "connectorDefinitionName": "AzureActivity",
+                "dataTypes": {
+                  "azureActivity": {
+                    "state": "Enabled"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', 'rg-aio-security')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "resourceGroupName": {
+      "type": "string",
+      "value": "rg-aio-security"
+    },
+    "sentinelWorkspace": {
+      "type": "string",
+      "value": "[parameters('sentinelWorkspaceId')]"
+    },
+    "opsWorkspace": {
+      "type": "string",
+      "value": "[parameters('opsWorkspaceId')]"
+    }
+  }
+}
